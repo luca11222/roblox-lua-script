@@ -1,0 +1,97 @@
+-- Enemy Detection system and simple chasing
+```lua
+local enemyClass = {}
+enemyClass.__index = enemyClass
+
+local Players = game:GetService("Players")
+
+-- constructor
+function enemyClass.new(model)
+	local self = setmetatable({}, enemyClass)
+
+	self.model = model
+	self.humanoid = model:WaitForChild("Humanoid")
+	self.root = model:WaitForChild("HumanoidRootPart")
+
+	self.target = nil
+	self.state = "idle"
+	self.range = 60
+	self.moving = false
+
+	return self
+end
+
+-- simple distance check
+function enemyClass:getClosestPlayer()
+	local closest
+	local dist = math.huge
+
+	for _, player in pairs(Players:GetPlayers()) do
+		local char = player.Character
+		if not char then continue end
+
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if not hrp then continue end
+
+		local magnitude = (hrp.Position - self.root.Position).Magnitude
+
+		if magnitude < dist then
+			dist = magnitude
+			closest = char
+		end
+	end
+
+	return closest, dist
+end
+
+-- basic vision (not using raycast here just simple)
+function enemyClass:canSee(target)
+	if not target then return end
+
+	local hrp = target:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local direction = (hrp.Position - self.root.Position).Unit
+	local look = self.root.CFrame.LookVector
+
+	local dot = look:Dot(direction)
+
+	-- 0.5 is kinda like 60 deg
+	if dot > 0.5 then
+		return true
+	end
+end
+
+-- follow player
+function enemyClass:follow(target)
+	if not target then return end
+
+	local hrp = target:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	self.humanoid:MoveTo(hrp.Position)
+	self.moving = true
+end
+
+-- main update loop
+function enemyClass:update()
+	local target, dist = self:getClosestPlayer()
+
+	if target and dist < self.range then
+		if self:canSee(target) then
+			self.target = target
+			self.state = "chasing"
+		end
+	end
+
+	if self.state == "chasing" then
+		if self.target then
+			self:follow(self.target)
+		else
+			self.state = "idle"
+		end
+	end
+end
+
+return enemyClass
+```
